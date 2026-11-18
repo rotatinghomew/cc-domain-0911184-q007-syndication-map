@@ -27,7 +27,15 @@ docker run --rm --network=none syndication-map:local python3 -m unittest discove
 
 ## 数据流与接口
 
-Feed 校验来源名称及单轮来源 ID；IdentityBook 保存每个来源记录的独立对象和修订观察；Frontier 为当前来源地址安排下次访问。撤稿条目使用较慢复查周期。测试网站支持修改 feed、redirects 和 withdrawn，来源编号与修订由测试调用方控制。当前对象间不存在自动合并关系，同标题不会去重，人工关联及撤销尚不属于现有接口。
+Feed 校验来源名称及单轮来源 ID。IdentityBook 为每条来源记录保留不可变的 object_id、全部修订观察与各来源自己的措辞；跨来源关联是叠加在记录之上的可撤销图，而不是删除或折叠记录。
+
+关联判定由 similarity.compare 给出证据：记录声明的 canonical 地址（只在能唯一指向对方记录时）为硬证据；正文近乎一致且另有发布者或日期等独立信号为强证据；较弱匹配只形成待确认提案。仅标题相同、共用模板正文、或共同指向频道首页都不足以合并。
+
+resolution.Resolver 记录地址解析：只有最终落到具体公告的重定向才算已确认迁移，后续抓取与待抓计划跟到新地址；落到频道首页、重定向环或无法确认的目标记为 index/unresolved，不参与关联，也不会批量改写其它公告的地址。synchronize 还会发现多条公告收敛到同一目标的情形并按频道首页处理。
+
+来源编号被后续公告复用时，旧记录进入 retired_records 并保留其地址与待抓目标，新记录获得新对象，二者互不覆盖。撤稿按来源分别记录：原发撤稿而转载仍在时，两条事实都保留，关联对象报告 withdrawn_mismatch，不替转载站推断撤稿，也不把已撤回原文列为当前有效内容。
+
+人工接口为 confirm / revoke / detach / split（亦可用 record 元组调用 confirm_records 等）。人工判定写入 split_exclusions，自动重算不会把已拆分对象重新粘回，重跑不会重复创建公告。explain(frontier=...) 返回当前关联依据、冲突（未确认匹配、未解析重定向、撤稿不一致、编号复用）以及下一轮准备访问的地址及各自状态。
 
 ## 验证与数据
 
